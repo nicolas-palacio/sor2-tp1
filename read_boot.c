@@ -28,7 +28,7 @@ int main() {
     PartitionTable pt[4];
     Fat12BootSector bs;
     
-    fseek(in, ... , SEEK_SET); // Ir al inicio de la tabla de particiones. Completar ...
+    fseek(in,446, SEEK_SET); // Ir al inicio de la tabla de particiones. Completar ...
     fread(pt, sizeof(PartitionTable), 4, in); // leo entradas 
     
     for(i=0; i<4; i++) {        
@@ -44,13 +44,13 @@ int main() {
         return -1;
     }
     
-    fseek(in, 0, SEEK_SET);
+    fseek(in,446, SEEK_SET);
     fread(&bs, sizeof(Fat12BootSector), 1, in);
     
     printf("  Jump code: %02X:%02X:%02X\n", bs.jmp[0], bs.jmp[1], bs.jmp[2]);
     printf("  OEM code: [%.8s]\n", bs.oem);
     printf("  sector_size: %d\n", bs.sector_size);
-	// {...} COMPLETAR
+	// {...} COMPLETAR   
     printf("  volume_id: 0x%08X\n", bs.volume_id);
     printf("  Volume label: [%.11s]\n", bs.volume_label);
     printf("  Filesystem type: [%.8s]\n", bs.fs_type);
