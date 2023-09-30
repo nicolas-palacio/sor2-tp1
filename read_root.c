@@ -51,30 +51,83 @@ typedef struct {
     unsigned long file_size; //Bytes 28-31.
 } __attribute((packed)) Fat12Entry;
 
-void print_file_info(Fat12Entry *entry,int i) {
-//printf("Archivo:%s --Entrada: %i,Cluster de inicio:%d\n",entry->filename,i,entry->first_cluster_add_2);
+unsigned int cluster_size,cluster_2_start;
+unsigned short bytes_per_sector;
+
+void show_dir_files(Fat12Entry *entry);
+
+void print_dir_info(Fat12Entry *entry,int i) {
+
    switch(entry->filename[0]) {
         case 0x00:
             break; // unused entry
         case 0x0E5: // Completar los ...
-            printf("Archivo borrado: [?%.7s.%.3s]\n", entry->filename, entry->file_extension);// COMPLETAR
+            if(entry->first_cluster_add_2==0){
+                break;
+            }
+            printf("  --Archivo borrado: [?%.7s.%.3s]\n", entry->filename, entry->file_extension);// COMPLETAR
             break;
-        /*case ...: // Completar los ...
-            printf("Archivo que comienza con 0xE5: [%c%.7s.%.3s]\n", 0xE5,) // COMPLETAR 
-            break;*/
-    
-    }
-
-    switch(entry->file_attribute) {
+        default:
+            switch(entry->file_attribute) {
         case 0x10:
-            printf("Directorio: [%.8s.%.3s] \n", entry->filename, entry->file_extension);
+            printf("  --Directorio: [%.8s.%.3s], Cluster de inicio:%d \n", entry->filename, entry->file_extension,entry->first_cluster_add_2);
+            show_dir_files(entry);
             break;
         case 0x20:
-            //printf("Archivo: [%.8s %s]\n", entry->filename, entry->file_extension);
-            printf("Archivo:%s --Entrada: %i,Cluster de inicio:%d\n",entry->filename,i,entry->first_cluster_add_2);
-            break;    
-    }       
+            printf("  --Archivo:%s --Entrada: #%i,Cluster de inicio:%d\n",entry->filename,i,entry->first_cluster_add_2);
+            break;        
+    }  
     
+    }
+            
+}
+
+
+void show_dir_files(Fat12Entry *entry){ //Muestro los archivos de un directorio
+    Fat12Entry new_entry;
+    FILE * in = fopen("test.img", "rb");
+    unsigned int file_cluster_start=((entry->first_cluster_add_2-2)*cluster_size)+cluster_2_start;// -2 porque arranco a contar desde el Cluster #2;
+    unsigned int file_cluster_end=file_cluster_start+cluster_size-1;
+    int b;
+    int index=1;
+
+    fseek(in,file_cluster_start,SEEK_SET); 
+    fread(&new_entry, sizeof(new_entry), 1, in);
+
+     printf("  --Byte inicial: %i |Byte final: %i  \n",file_cluster_start,file_cluster_end);   
+
+    for(b=file_cluster_start+32; b<=file_cluster_end; b+=32) {//En cada iteracion se mueve 32bytes, el tamanio de cada entrada;       
+        fseek(in,b,SEEK_SET); 
+        fread(&new_entry, sizeof(new_entry), 1, in);
+        print_dir_info(&new_entry,index);
+    }
+    fclose(in);
+}
+
+void print_file_info(Fat12Entry *entry,int i) {
+
+   switch(entry->filename[0]) {
+        case 0x00:
+            break; // unused entry
+        case 0x0E5: // Completar los ...
+            if(entry->first_cluster_add_2==0){
+                    break;
+                }
+            printf("Archivo borrado: [?%.7s.%.3s] --Entrada: #%i,Cluster de inicio:%d\n", entry->filename, entry->file_extension,i,entry->first_cluster_add_2);
+            break;
+        default:
+            switch(entry->file_attribute) {
+        case 0x10:
+            printf("Directorio: [%.8s.%.3s], Cluster de inicio:%d \n", entry->filename, entry->file_extension,entry->first_cluster_add_2);
+            show_dir_files(entry);
+            break;
+        case 0x20:
+            printf("Archivo:%s --Entrada: #%i,Cluster de inicio:%d\n",entry->filename,i,entry->first_cluster_add_2);
+            break;        
+        }
+    
+    }
+              
 }
 
 int main() {
@@ -104,33 +157,32 @@ int main() {
 	//{...} Leo boot sector
     fread(&bs,sizeof(Fat12BootSector),1,in);
     
+    cluster_size=bs.sectors_per_cluster*bs.sector_size;
+    bytes_per_sector=bs.sector_size;
+
     printf("En  0x%lX, sector size %d, FAT size %d sectors, %d FATs\n\n", 
            ftell(in), bs.sector_size, bs.fat_size_sectors, bs.number_of_fats);
-           
-    printf("ACTUAL: %ld\n",ftell(in));
 
-    int root_directory_start=(bs.fat_size_sectors*512)*bs.number_of_fats +512; //Se le suma los 512 bytes del Boot Sector; 
-    printf("INICIO ROOT:%i\n",root_directory_start);
+    
+    //printf("Tam de cada cluster: %d\n",cluster_size);       
+    //printf("ACTUAL: %ld\n",ftell(in));
 
-    /*fseek(in, root_directory_start+96, SEEK_SET); //PRUEBA.TXT
-    fread(&entry, sizeof(entry), 1, in);
-    print_file_info(&entry,1);*/
-
-    //fseek(in, (bs.reserved_sectors-1 + bs.fat_size_sectors * bs.number_of_fats) *bs.sector_size, SEEK_CUR);
+    int root_directory_start=((bs.fat_size_sectors*512)*bs.number_of_fats)+512; //Se le suma los 512 bytes del Boot Sector; 
+   
     
     printf("Root dir_entries %d \n", bs.root_dir_entries);
-    printf("Inicio del Root Directory: %i\n",(bs.reserved_sectors-1 + bs.fat_size_sectors * bs.number_of_fats) *bs.sector_size);
-    
-    
-    
-    for(i=0; i<bs.root_dir_entries; i++) {
-        //printf("ACTUAL: %ld\n",ftell(in)); 
-        fseek(in,root_directory_start+32*i,SEEK_SET);
+    printf("Inicio del Root Directory: byte #%i\n",root_directory_start);
+
+    unsigned int fats_size=(bs.sector_size * bs.fat_size_sectors) * bs.number_of_fats;
+    cluster_2_start=fats_size+(32*bs.sector_size)+512;//El Root Directory, por definicion, ocupa 32 sectores;
+    printf("Fin del Root Directory : byte #%i \n",cluster_2_start-1);
+
+    for(i=0; i<bs.root_dir_entries; i++) {      
+        fseek(in,root_directory_start+32*i,SEEK_SET); //En cada iteracion se mueve 32bytes, el tamanio de cada entrada;
         fread(&entry, sizeof(entry), 1, in);
         print_file_info(&entry,i);
     }
-    
-    printf("\nLeido Root directory, ahora en 0x%lX\n", ftell(in));
+
     fclose(in);
     return 0;
 }
