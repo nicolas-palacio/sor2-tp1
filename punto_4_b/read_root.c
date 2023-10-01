@@ -33,7 +33,7 @@ typedef struct { //Unsigned = hexa
     unsigned char ext_boot_signaturel; //Byte 38.
     unsigned int volume_id;//Bytes 39-42.
     char volume_label[11];
-    char fs_type[8];
+    char fs_type[8]; // FAT12, la unica particion
     char boot_code[448];
     unsigned short boot_sector_signature;
 } __attribute((packed)) Fat12BootSector;
@@ -58,7 +58,7 @@ unsigned int cluster_size,cluster_2_start;
 unsigned short bytes_per_sector;
 
 void show_dir_files(Fat12Entry *entry,char *file_to_search);
-bool print_file_info(Fat12Entry *entry,char *string);
+bool print_file_info(Fat12Entry *entry,char *string,int actual_byte);
 
 void show_file_content(Fat12Entry *entry) {// Muestra el contenido de los archivos txt
     Fat12Entry new_entry;
@@ -86,6 +86,23 @@ void show_file_content(Fat12Entry *entry) {// Muestra el contenido de los archiv
     fclose(in);        
 }
 
+void retrieve_file(Fat12Entry *entry,int actual_byte){//Recupero un archivo borrado
+    FILE * in = fopen("test.img", "rb+"); //Abro la imagen con permisos de escritura y lectura;
+    char retrieve_file_name[]="Rec"; //Lo renombrara a Rec.TXT
+    int pos=0;
+    
+    
+    printf("Recuperando archivo en byte %d...\n",actual_byte);
+
+    fseek(in,actual_byte,SEEK_SET);
+    fwrite(&retrieve_file_name,sizeof(char),7,in);
+    
+
+    printf("Archivo recuperado.\n");
+
+    fclose(in); 
+}
+
 
 void show_dir_files(Fat12Entry *entry,char *file_to_search){ //Muestro los archivos de un directorio
     Fat12Entry new_entry;
@@ -101,15 +118,14 @@ void show_dir_files(Fat12Entry *entry,char *file_to_search){ //Muestro los archi
     for(b=file_cluster_start+32; b<=file_cluster_end; b+=32) {//En cada iteracion se mueve 32bytes, el tamanio de cada entrada;       
         fseek(in,b,SEEK_SET); 
         fread(&new_entry, sizeof(new_entry), 1, in);
-        print_file_info(&new_entry,file_to_search);
+        print_file_info(&new_entry,file_to_search,b);
     }
     fclose(in);
 }
 
-bool print_file_info(Fat12Entry *entry,char *string) {
+bool print_file_info(Fat12Entry *entry,char *string,int actual_byte) {
     char *resultado=strstr(entry->filename,string);
-    size_t longitud=strlen(entry->filename);
-
+    
 
    switch(entry->filename[0]) {
         case 0x00:
@@ -117,6 +133,7 @@ bool print_file_info(Fat12Entry *entry,char *string) {
         case 0x0E5:           
             if(resultado!=NULL){
                 printf("Archivo localizado. Esta borrado [?%.7s.%.3s]\n", entry->filename, entry->file_extension);
+                retrieve_file(entry,actual_byte);
                 return true;
             }            
             break;
@@ -126,9 +143,9 @@ bool print_file_info(Fat12Entry *entry,char *string) {
                     show_dir_files(entry,string);
                     break;
                 case 0x20:
-                    printf("FILENAME:%s | String:%s Resultado: %s\n",entry->filename,string,resultado);                    
+                    //printf("FILENAME:%s | String:%s Resultado: %s\n",entry->filename,string,resultado);                    
                     if(resultado!=NULL){
-                        printf("Archivo localizado! %s \n",entry->filename);
+                        printf("Archivo localizado! [%.7s.%.3s]\n",entry->filename, entry->file_extension);
                         return true;
                     }                   
                     break;        
@@ -179,19 +196,20 @@ int main() {
     to_upper_case(file_search);
 
     printf("\nBuscando archivo llamado:%s\n",file_search);
-
-    for(i=0; i<bs.root_dir_entries; i++) {      
-        fseek(in,root_directory_start+32*i,SEEK_SET); //En cada iteracion se mueve 32bytes, el tamanio de cada entrada;
+    int actual_byte;
+ 
+    for(i=0; i<bs.root_dir_entries; i++) {  
+        actual_byte=root_directory_start+32*i;        
+        fseek(in,actual_byte,SEEK_SET); //En cada iteracion se mueve 32bytes, el tamanio de cada entrada;
         fread(&entry, sizeof(entry), 1, in);
-        if(print_file_info(&entry,file_search)==true){
-            printf("Archivo localizadoooooo.\n");
-
+        if(print_file_info(&entry,file_search,actual_byte)==true){        
             fclose(in);
             return 0;
             //break;
         }
         
     }
+    printf("No se encontro el archivo.\n");
 
     fclose(in);
     return 0;
