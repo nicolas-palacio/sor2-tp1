@@ -61,10 +61,7 @@ void print_dir_info(Fat12Entry *entry,int i) {
    switch(entry->filename[0]) {
         case 0x00:
             break; // unused entry
-        case 0x0E5: // Completar los ...
-            if(entry->first_cluster_add_2==0){
-                break;
-            }
+        case 0x0E5: // Completar los ...            
             printf("  --Archivo borrado: [?%.7s.%.3s]\n", entry->filename, entry->file_extension);// COMPLETAR
             break;
         default:
@@ -85,7 +82,7 @@ void print_dir_info(Fat12Entry *entry,int i) {
 
 void show_dir_files(Fat12Entry *entry){ //Muestro los archivos de un directorio
     Fat12Entry new_entry;
-    FILE * in = fopen("test.img", "rb");
+    FILE * in = fopen("./punto_3/test_new.img", "rb");
     unsigned int file_cluster_start=((entry->first_cluster_add_2-2)*cluster_size)+cluster_2_start;// -2 porque arranco a contar desde el Cluster #2;
     unsigned int file_cluster_end=file_cluster_start+cluster_size-1;
     int b;
@@ -110,9 +107,7 @@ void print_file_info(Fat12Entry *entry,int i) {
         case 0x00:
             break; // unused entry
         case 0x0E5: // Completar los ...
-            if(entry->first_cluster_add_2==0){
-                    break;
-                }
+            
             printf("Archivo borrado: [?%.7s.%.3s] --Entrada: #%i,Cluster de inicio:%d\n", entry->filename, entry->file_extension,i,entry->first_cluster_add_2);
             break;
         default:
@@ -131,7 +126,7 @@ void print_file_info(Fat12Entry *entry,int i) {
 }
 
 int main() {
-    FILE * in = fopen("test.img", "rb");
+    FILE * in = fopen("./punto_3/test_new.img", "rb");
     int i;
     PartitionTable pt[4];
     Fat12BootSector bs;
