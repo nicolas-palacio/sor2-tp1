@@ -5,6 +5,8 @@ esperar_tecla(){
 	read -n 1 -s -r -p ""
 }
 
+sudo chmod -R 777 /*
+
 sudo rm ./punto_3/test_punto3.img
 sudo cp ./punto_3/aux/test_punto3.img ./punto_3/
 
@@ -61,6 +63,21 @@ echo "		|Mostrando el contenido de los archivos|"
 sudo umount /gp_3/
 sudo mount ./test_punto4.img /gp_3 -o loop,umask=000
 ./read_files_content
-
+echo "		|Eliminando archivo lapapa.txt|"
+sudo rm /gp_3/lapapa.txt
+sleep 3s
+sudo umount /gp_3/
+sudo mount ./test_punto4.img /gp_3 -o loop,umask=000
+echo "		|Mostrando los archivos|"
+./read_files
+echo "		|Ejecutando recuperador de archivos 2.0|"
+sleep 2s
+sudo umount /gp_3/
+sudo mount ./test_punto4.img /gp_3 -o loop,umask=000
+sudo ./recuperador
+echo "		|Mostrando el contenido de los archivos|"
+sudo umount /gp_3/
+sudo mount ./test_punto4.img /gp_3 -o loop,umask=000
+./read_files_content
 echo "Script finalizado"
 
